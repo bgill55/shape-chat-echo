@@ -4,6 +4,7 @@ import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Chatbot } from '@/pages/Index';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -22,6 +23,7 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,20 +44,62 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate bot response (replace with actual Shapes.inc API call)
-    setTimeout(() => {
+    try {
+      // Extract shape username from URL (e.g., "bella-donna" from "https://shapes.inc/bella-donna")
+      const shapeUsername = selectedChatbot.url.split('/').pop() || selectedChatbot.name.toLowerCase().replace(/\s+/g, '-');
+      
+      const response = await fetch('https://api.shapes.inc/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: `shapesinc/${shapeUsername}`,
+          messages: [
+            { role: "user", content: currentInput }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `Hello! I'm ${selectedChatbot.name}. I received your message: "${userMessage.content}". How can I help you today?`,
+        content: data.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.",
         sender: 'bot',
         timestamp: new Date()
       };
+      
       setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error calling Shapes API:', error);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "Sorry, I encountered an error while processing your message. Please check your API key and try again.",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please check your API key and try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
