@@ -5,6 +5,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { ChatArea } from '@/components/ChatArea';
 import { AddShapeModal } from '@/components/AddShapeModal';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
+import { MobileHeader } from '@/components/MobileHeader';
 
 export interface Chatbot {
   id: string;
@@ -39,8 +40,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-[#36393f] text-white">
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <div className="min-h-screen flex w-full">
+          {/* Mobile Header */}
+          <MobileHeader 
+            onAddShape={() => setIsAddShapeModalOpen(true)}
+            onOpenApiConfig={() => setIsApiKeyModalOpen(true)}
+          />
+          
           <AppSidebar 
             chatbots={chatbots}
             selectedChatbot={selectedChatbot}

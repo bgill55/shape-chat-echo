@@ -67,17 +67,20 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
 
   if (!selectedChatbot) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#36393f]">
-        <div className="text-center text-[#96989d]">
+      <div className="flex-1 flex items-center justify-center bg-[#36393f] pt-16 md:pt-0">
+        <div className="text-center text-[#96989d] px-4">
           <h2 className="text-2xl font-semibold mb-2">Welcome to Shapes Chat</h2>
-          <p>Select a chatbot from the sidebar to start a conversation</p>
+          <p className="mb-4">Select a chatbot from the sidebar to start a conversation</p>
+          <p className="text-sm text-[#72767d]">
+            On mobile, tap the menu button in the top left to open the sidebar
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#36393f]">
+    <div className="flex-1 flex flex-col bg-[#36393f] pt-16 md:pt-0">
       {/* Chat Header */}
       <div className="h-16 bg-[#36393f] border-b border-[#202225] flex items-center px-4">
         <div className="w-8 h-8 bg-[#5865f2] rounded-full flex items-center justify-center mr-3">
