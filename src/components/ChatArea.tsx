@@ -1,10 +1,10 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Chatbot } from '@/pages/Index';
 import { useToast } from '@/hooks/use-toast';
+import { AudioPlayer } from './AudioPlayer';
 
 interface Message {
   id: string;
@@ -32,6 +32,29 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const isAudioUrl = (content: string): string | null => {
+    const audioUrlRegex = /(https:\/\/files\.shapes\.inc\/[^\s]+\.mp3)/g;
+    const match = content.match(audioUrlRegex);
+    return match ? match[0] : null;
+  };
+
+  const renderMessageContent = (message: Message) => {
+    const audioUrl = isAudioUrl(message.content);
+    
+    if (audioUrl && message.sender === 'bot') {
+      const textContent = message.content.replace(audioUrl, '').trim();
+      
+      return (
+        <div className="space-y-2">
+          {textContent && <p className="text-sm">{textContent}</p>}
+          <AudioPlayer src={audioUrl} />
+        </div>
+      );
+    }
+    
+    return <p className="text-sm">{message.content}</p>;
+  };
 
   const sendMessage = async () => {
     if (!inputValue.trim() || !selectedChatbot || !apiKey) return;
@@ -152,7 +175,7 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
                   : 'bg-[#2f3136] text-white border border-[#202225]'
               }`}
             >
-              <p className="text-sm">{message.content}</p>
+              {renderMessageContent(message)}
               <p className="text-xs opacity-70 mt-1">
                 {message.timestamp.toLocaleTimeString()}
               </p>
