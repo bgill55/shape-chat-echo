@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import { ChatArea } from './ChatArea'; // Adjust path as necessary
 import { ImagePreview } from './ui/ImagePreview'; // Adjust path
@@ -206,7 +207,7 @@ describe('ChatArea component - renderMessageContent logic', () => {
     });
 
     it('does not render ImagePreview if sender is user', () => {
-      const message = { ...baseMessage, sender: 'user', content: 'My image: https://files.shapes.inc/user.png' };
+      const message = { ...baseMessage, sender: 'user' as const, content: 'My image: https://files.shapes.inc/user.png' };
       const { queryByTestId, getByText } = render(mockRenderMessageContent(message));
       
       expect(queryByTestId('image-preview')).not.toBeInTheDocument();
