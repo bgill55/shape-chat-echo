@@ -1,3 +1,4 @@
+
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
@@ -80,9 +81,10 @@ describe('ChatArea component - renderMessageContent logic', () => {
   // Since it *is* extracted but part of the same file, we can't easily mock it directly using vi.mock for itself.
   // For these tests, we will assume performApiCall is implicitly tested by sendMessage effects.
   // If we wanted to prevent actual fetch, we'd mock `global.fetch`.
-  vi.spyOn(global, 'fetch').mockImplementation(async () => {
+  const mockFetch = vi.fn().mockImplementation(async () => {
     return new Response(JSON.stringify({ choices: [{ message: { content: "Mocked bot response" } }] }), { status: 200 });
   });
+  global.fetch = mockFetch;
 
 
   const renderChatArea = () => {
@@ -100,7 +102,7 @@ describe('ChatArea component - renderMessageContent logic', () => {
     mockCreateObjectURL.mockClear();
     mockRevokeObjectURL.mockClear();
     // Reset fetch mock
-    (global.fetch as ReturnType<typeof vi.spyOn>).mockClear();
+    mockFetch.mockClear();
 
   });
 
