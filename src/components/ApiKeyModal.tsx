@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,14 +62,8 @@ export function ApiKeyModal({ isOpen, onClose, onSaveApiKey, currentApiKey }: Ap
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-[#36393f] border-[#202225] text-white max-w-md">
-        <DialogHeader className="flex flex-row items-center justify-between p-0">
+        <DialogHeader>
           <h2 className="text-xl font-semibold">Shapes API Configuration</h2>
-          <button
-            onClick={onClose}
-            className="text-[#96989d] hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </DialogHeader>
 
         <div className="mt-4">
