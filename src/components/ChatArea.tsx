@@ -341,11 +341,10 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
             variant="outline"
             onClick={handleImageUploadButtonClick}
             disabled={!apiKey || isLoading}
-            className="p-2 text-white border-[#202225] hover:bg-[#40444b]"
+            className="p-2 bg-[#40444b] text-[#96989d] border-[#202225] hover:bg-[#202225] hover:text-white"
             aria-label="Attach image"
           >
-            {/* Using a simple text representation for now, can be replaced with an icon */}
-            [+Image]
+            📎 Image
           </Button>
           <input
             type="file"
@@ -353,7 +352,7 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
             ref={fileInputRef}
             onChange={handleFileSelected}
             className="hidden"
-            data-testid="hidden-file-input" // Added for testing
+            data-testid="hidden-file-input"
           />
           <Input
             value={inputValue}
