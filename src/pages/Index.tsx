@@ -1,11 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from '@/components/AppSidebar';
 import { ChatArea } from '@/components/ChatArea';
 import { AddShapeModal } from '@/components/AddShapeModal';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
 import { MobileHeader } from '@/components/MobileHeader';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Chatbot {
   id: string;
@@ -19,6 +20,14 @@ const Index = () => {
   const [isAddShapeModalOpen, setIsAddShapeModalOpen] = useState(false);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [apiKey, setApiKey] = useState<string>('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const savedApiKey = localStorage.getItem('shapes-api-key');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    }
+  }, []);
 
   const addChatbot = (url: string) => {
     const name = url.split('/').pop() || 'Unknown Bot';
@@ -28,9 +37,15 @@ const Index = () => {
       url
     };
     setChatbots([...chatbots, newChatbot]);
-    if (!selectedChatbot) {
-      setSelectedChatbot(newChatbot);
-    }
+    
+    // Automatically select the newly added chatbot
+    setSelectedChatbot(newChatbot);
+    
+    // Show success toast
+    toast({
+      title: "Shape Added Successfully!",
+      description: `${newChatbot.name} is now ready to chat. Chat window is now active.`,
+    });
   };
 
   const saveApiKey = (key: string) => {
