@@ -12,6 +12,7 @@ interface Message {
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  imageUrl?: string; // For user-sent image previews (local blob URL)
 }
 
 interface ChatAreaProps {
@@ -23,7 +24,10 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const scrollToBottom = () => {
@@ -33,6 +37,24 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Effect to handle object URL cleanup
+  useEffect(() => {
+    // If there's an image preview URL, and selectedImageFile is null (meaning it was cleared)
+    // or if the component unmounts with an active previewUrl, revoke it.
+    let currentPreviewUrl = imagePreviewUrl; // Capture the value for cleanup
+    if (!selectedImageFile && currentPreviewUrl) {
+      URL.revokeObjectURL(currentPreviewUrl);
+      setImagePreviewUrl(null); // Ensure preview URL state is also cleared
+    }
+    
+    // Cleanup function to be called when selectedImageFile changes or component unmounts
+    return () => {
+      if (currentPreviewUrl) {
+        URL.revokeObjectURL(currentPreviewUrl);
+      }
+    };
+  }, [selectedImageFile]); // Rerun when selectedImageFile changes
 
   const isAudioUrl = (content: string): string | null => {
     const audioUrlRegex = /(https:\/\/files\.shapes\.inc\/[^\s]+\.mp3)/g;
@@ -47,22 +69,36 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
   };
 
   const renderMessageContent = (message: Message) => {
-    const audioUrl = isAudioUrl(message.content);
-    const imageUrl = isImageUrl(message.content);
+    // User-sent images with local preview
+    if (message.sender === 'user' && message.imageUrl) {
+      return (
+        <div className="space-y-1">
+          {message.content && <p className="text-sm">{message.content}</p>}
+          <img 
+            src={message.imageUrl} 
+            alt="User upload preview" 
+            className="max-w-[200px] h-auto rounded mt-1 border border-blue-400" // Adjusted styling for user images
+          />
+        </div>
+      );
+    }
 
-    if (imageUrl && message.sender === 'bot') {
-      const textContent = message.content.replace(imageUrl, '').trim();
+    // Bot messages with image URL (rendered via ImagePreview component)
+    const botImageUrl = isImageUrl(message.content);
+    if (botImageUrl && message.sender === 'bot') {
+      const textContent = message.content.replace(botImageUrl, '').trim();
       return (
         <div className="space-y-2">
           {textContent && <p className="text-sm">{textContent}</p>}
-          <ImagePreview src={imageUrl} alt="Bot image content" />
+          <ImagePreview src={botImageUrl} alt="Bot image content" />
         </div>
       );
     }
     
+    // Bot messages with audio URL
+    const audioUrl = isAudioUrl(message.content);
     if (audioUrl && message.sender === 'bot') {
       const textContent = message.content.replace(audioUrl, '').trim();
-      
       return (
         <div className="space-y-2">
           {textContent && <p className="text-sm">{textContent}</p>}
@@ -71,28 +107,14 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
       );
     }
     
+    // Default: plain text message (for user or bot without special content)
     return <p className="text-sm">{message.content}</p>;
   };
 
-  const sendMessage = async () => {
-    if (!inputValue.trim() || !selectedChatbot || !apiKey) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue,
-      sender: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    const currentInput = inputValue;
-    setInputValue('');
+  const performApiCall = async (apiKey: string, selectedChatbot: Chatbot, messageContent: any) => {
     setIsLoading(true);
-
     try {
-      // Extract shape username from URL (e.g., "bella-donna" from "https://shapes.inc/bella-donna")
       const shapeUsername = selectedChatbot.url.split('/').pop() || selectedChatbot.name.toLowerCase().replace(/\s+/g, '-');
-      
       const response = await fetch('https://api.shapes.inc/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -101,9 +123,7 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
         },
         body: JSON.stringify({
           model: `shapesinc/${shapeUsername}`,
-          messages: [
-            { role: "user", content: currentInput }
-          ]
+          messages: [{ role: "user", content: messageContent }]
         })
       });
 
@@ -112,34 +132,126 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
       }
 
       const data = await response.json();
-      
       const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: (Date.now() + 1).toString(), // Ensure unique ID
         content: data.choices?.[0]?.message?.content || "I'm sorry, I couldn't generate a response.",
         sender: 'bot',
         timestamp: new Date()
       };
-      
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Error calling Shapes API:', error);
-      
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: "Sorry, I encountered an error while processing your message. Please check your API key and try again.",
+      const errorMessageContent = error instanceof Error ? error.message : "Sorry, I encountered an error while processing your message.";
+      const errorBotMessage: Message = {
+        id: (Date.now() + 1).toString(), // Ensure unique ID
+        content: `Error: ${errorMessageContent}. Please check your API key and try again.`,
         sender: 'bot',
         timestamp: new Date()
       };
-      
-      setMessages(prev => [...prev, errorMessage]);
-      
+      setMessages(prev => [...prev, errorBotMessage]);
       toast({
-        title: "Error",
-        description: "Failed to send message. Please check your API key and try again.",
+        title: "API Error",
+        description: errorMessageContent,
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const sendMessage = async () => {
+    if ((!inputValue.trim() && !selectedImageFile) || !selectedChatbot || !apiKey) return;
+
+    const currentInput = inputValue;
+    const currentImageFile = selectedImageFile;
+    const currentImagePreviewUrl = imagePreviewUrl; // Capture preview URL before reset
+
+    // Construct user message for local display
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: currentInput, // Only text part for content
+      sender: 'user',
+      timestamp: new Date(),
+      imageUrl: currentImageFile ? currentImagePreviewUrl : undefined, // Store preview URL
+    };
+    setMessages(prev => [...prev, userMessage]);
+    
+    setInputValue('');
+    setSelectedImageFile(null); 
+    // imagePreviewUrl will be set to null by its useEffect due to selectedImageFile changing
+
+    if (currentImageFile) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64DataUri = e.target?.result as string;
+        if (!base64DataUri) {
+          console.error("Failed to read file as Base64.");
+          // Update the optimistic user message to indicate failure
+          setMessages(prev => prev.map(msg => 
+            msg.id === userMessage.id ? {...msg, content: `${userMessage.content} [Image send failed (read error)]`} : msg
+          ));
+          setIsLoading(false); 
+          return;
+        }
+
+        const apiMessageContent: any[] = [];
+        if (currentInput.trim()) {
+          apiMessageContent.push({ type: "text", text: currentInput.trim() });
+        }
+        apiMessageContent.push({ type: "image_url", image_url: { url: base64DataUri } });
+        
+        performApiCall(apiKey, selectedChatbot, apiMessageContent);
+      };
+      reader.onerror = (error) => {
+        console.error("FileReader error:", error);
+        setMessages(prev => prev.map(msg => 
+            msg.id === userMessage.id ? {...msg, content: `${userMessage.content} [Image send failed (read error)]`} : msg
+        ));
+          setIsLoading(false); 
+        toast({
+          title: "File Read Error",
+          description: "Could not read the selected image file.",
+          variant: "destructive"
+        });
+      };
+      reader.readAsDataURL(currentImageFile);
+    } else {
+      // Only text is present
+      performApiCall(apiKey, selectedChatbot, currentInput);
+    }
+  };
+
+  const handleImageUploadButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedImageFile(file);
+      const newPreviewUrl = URL.createObjectURL(file);
+      setImagePreviewUrl(newPreviewUrl);
+    } else {
+      setSelectedImageFile(null);
+      // imagePreviewUrl will be handled by the useEffect cleanup or directly here
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+      setImagePreviewUrl(null);
+    }
+    event.target.value = ''; // Allow selecting the same file again
+  };
+
+  const handleRemoveSelectedImage = () => {
+    setSelectedImageFile(null);
+    // The useEffect for selectedImageFile will handle revoking imagePreviewUrl
+    // and setting it to null. If direct feedback is needed, uncomment below:
+    // if (imagePreviewUrl) {
+    //   URL.revokeObjectURL(imagePreviewUrl);
+    // }
+    // setImagePreviewUrl(null); 
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // Clear the file input
     }
   };
 
@@ -224,7 +336,25 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
           </div>
         ) : null}
         
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 items-center">
+          <Button
+            variant="outline"
+            onClick={handleImageUploadButtonClick}
+            disabled={!apiKey || isLoading}
+            className="p-2 text-white border-[#202225] hover:bg-[#40444b]"
+            aria-label="Attach image"
+          >
+            {/* Using a simple text representation for now, can be replaced with an icon */}
+            [+Image]
+          </Button>
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleFileSelected}
+            className="hidden"
+            data-testid="hidden-file-input" // Added for testing
+          />
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -235,12 +365,33 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
           />
           <Button
             onClick={sendMessage}
-            disabled={!inputValue.trim() || !apiKey || isLoading}
+            disabled={(!inputValue.trim() && !selectedImageFile) || !apiKey || isLoading}
             className="bg-[#5865f2] hover:bg-[#4752c4] text-white"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {imagePreviewUrl && selectedImageFile && (
+          <div className="mt-2 flex items-center space-x-2">
+            <img 
+              src={imagePreviewUrl} 
+              alt="Selected preview" 
+              className="w-20 h-20 object-cover rounded border border-[#202225]" 
+            />
+            <div className="text-xs text-[#96989d] truncate">
+              {selectedImageFile.name}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRemoveSelectedImage}
+              className="text-red-500 hover:text-red-700 p-1"
+              aria-label="Remove selected image"
+            >
+              X
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
