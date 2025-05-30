@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Chatbot } from '@/pages/Index';
 import { useToast } from '@/hooks/use-toast';
 import { AudioPlayer } from './AudioPlayer';
+import { ImagePreview } from './ui/ImagePreview';
 
 interface Message {
   id: string;
@@ -39,8 +40,25 @@ export function ChatArea({ selectedChatbot, apiKey }: ChatAreaProps) {
     return match ? match[0] : null;
   };
 
+  const isImageUrl = (content: string): string | null => {
+    const imageUrlRegex = /(https:\/\/files\.shapes\.inc\/[^\s]+\.(png|jpg|jpeg|gif))/gi;
+    const match = content.match(imageUrlRegex);
+    return match ? match[0] : null;
+  };
+
   const renderMessageContent = (message: Message) => {
     const audioUrl = isAudioUrl(message.content);
+    const imageUrl = isImageUrl(message.content);
+
+    if (imageUrl && message.sender === 'bot') {
+      const textContent = message.content.replace(imageUrl, '').trim();
+      return (
+        <div className="space-y-2">
+          {textContent && <p className="text-sm">{textContent}</p>}
+          <ImagePreview src={imageUrl} alt="Bot image content" />
+        </div>
+      );
+    }
     
     if (audioUrl && message.sender === 'bot') {
       const textContent = message.content.replace(audioUrl, '').trim();
